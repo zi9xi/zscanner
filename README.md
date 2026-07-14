@@ -14,33 +14,11 @@
 
 不支持 UDP、IPv6、服务识别、网段扫描和漏洞检测。
 
-## 安装
+## 环境
 
-需要 Python 3.10 或更高版本。
-
-### Windows
-
-```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-```
-
-### Linux / macOS
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
-```
+需要 Python 3.10 或更高版本，无需安装第三方依赖。
 
 ## 使用
-
-```bash
-zscanner <目标> -p <端口> [选项]
-```
-
-也可以使用：
 
 ```bash
 python -m zscanner <目标> -p <端口>
@@ -51,31 +29,31 @@ python -m zscanner <目标> -p <端口>
 扫描一个端口：
 
 ```bash
-zscanner 127.0.0.1 -p 80
+python -m zscanner 127.0.0.1 -p 80
 ```
 
 扫描多个端口：
 
 ```bash
-zscanner localhost -p 22,80,443
+python -m zscanner localhost -p 22,80,443
 ```
 
 扫描端口范围：
 
 ```bash
-zscanner 192.168.1.10 -p 1-1024
+python -m zscanner 192.168.1.10 -p 1-1024
 ```
 
 混合端口并设置 0.5 秒超时：
 
 ```bash
-zscanner 192.168.1.10 -p 22,80,443,8000-8010 -t 0.5
+python -m zscanner 192.168.1.10 -p 22,80,443,8000-8010 -t 0.5
 ```
 
 默认只显示开放端口。显示关闭端口：
 
 ```bash
-zscanner 127.0.0.1 -p 22,80,443 --all
+python -m zscanner 127.0.0.1 -p 22,80,443 --all
 ```
 
 ### 参数
@@ -110,23 +88,8 @@ for result in scan("127.0.0.1", [22, 80, 443]):
 ## 项目结构
 
 ```text
-src/zscanner/
+zscanner/
 ├── cli.py       # 参数解析和命令行
 ├── scanner.py   # Socket 扫描核心
 └── __main__.py  # python -m zscanner 入口
-tests/           # 单元测试
 ```
-
-## 开发
-
-```bash
-pytest
-ruff check .
-mypy src
-```
-
-VS Code 打开项目后，选择 `.venv` 中的 Python 解释器即可运行和调试。
-
-## License
-
-[MIT](LICENSE)
