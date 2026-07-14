@@ -1,0 +1,74 @@
+# Local AI/Codex metadata
+.agents/
+.codex/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editor and IDE settings
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+*.suo
+*.user
+*.swp
+*~
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and runtime data
+*.log
+logs/
+*.pid
+*.seed
+
+# Caches and temporary files
+.cache/
+.tmp/
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Dependencies and virtual environments
+node_modules/
+vendor/
+.venv/
+venv/
+
+# Test and coverage output
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build output
+build/
+dist/
+out/
+target/
+bin/
+obj/
+*.egg-info/
+
+# Compiled files
+__pycache__/
+*.py[cod]
+*.class
+*.o
+*.obj
+*.exe
+*.dll
+*.so
