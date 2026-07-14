@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Tests and tools
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache*/
+.mypy_cache/
+.ruff_cache/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editors and operating systems
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~
+
+# Local Codex metadata
+.agents/
+.codex/

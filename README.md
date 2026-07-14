@@ -14,9 +14,14 @@
 
 不支持 UDP、IPv6、服务识别、网段扫描和漏洞检测。
 
-## 环境
+## 安装
 
-需要 Python 3.10 或更高版本，无需安装第三方依赖。
+需要 Python 3.10 或更高版本，无运行时第三方依赖。
+
+```bash
+python -m venv .venv
+python -m pip install -e ".[dev]"
+```
 
 ## 使用
 
@@ -88,8 +93,20 @@ for result in scan("127.0.0.1", [22, 80, 443]):
 ## 项目结构
 
 ```text
-zscanner/
+src/zscanner/
 ├── cli.py       # 参数解析和命令行
 ├── scanner.py   # Socket 扫描核心
 └── __main__.py  # python -m zscanner 入口
 ```
+
+## 测试
+
+```bash
+pytest --cov=src/zscanner --cov-report=term-missing
+ruff check .
+mypy src
+```
+
+## License
+
+[MIT](LICENSE)

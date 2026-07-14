@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "运行 zscanner（localhost）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "zscanner",
+      "args": [
+        "127.0.0.1",
+        "--ports",
+        "22,80,443",
+        "--show-closed"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "运行当前 Python 文件",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}
