@@ -1,6 +1,7 @@
 """zscanner public API."""
 
+from zscanner.ports import parse
 from zscanner.scanner import ScanResult, scan, scan_port
 
-__all__ = ["ScanResult", "scan", "scan_port"]
-__version__ = "0.1.1"
+__all__ = ["ScanResult", "parse", "scan", "scan_port"]
+__version__ = "0.2.0"

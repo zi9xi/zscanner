@@ -46,3 +46,17 @@ def test_main_reports_invalid_arguments() -> None:
     with pytest.raises(SystemExit) as exc:
         cli.main(["localhost", "-p", "invalid"])
     assert exc.value.code == 2
+
+
+def test_main_forwards_workers(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: list[int | None] = []
+
+    def fake_scan(
+        _host: str, _ports: list[int], _timeout: float, workers: int | None
+    ) -> list[ScanResult]:
+        received.append(workers)
+        return []
+
+    monkeypatch.setattr(cli, "scan", fake_scan)
+    assert cli.main(["localhost", "-p", "80", "--workers", "8"]) == 0
+    assert received == [8]

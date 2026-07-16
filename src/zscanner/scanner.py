@@ -3,7 +3,9 @@
 import errno
 import select
 import socket
+import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 
@@ -64,6 +66,48 @@ def scan_port(host: str, port: int, timeout: float = 1.0) -> ScanResult:
     return ScanResult(host, port, is_open, latency, error)
 
 
-def scan(host: str, ports: list[int], timeout: float = 1.0) -> list[ScanResult]:
-    """Scan ports in order. This loop can later be replaced by a thread pool."""
-    return [scan_port(host, port, timeout) for port in ports]
+ProgressCallback = Callable[[int, int], None]
+
+
+def scan(
+    host: str,
+    ports: list[int],
+    timeout: float = 1.0,
+    workers: int | None = None,
+    on_progress: ProgressCallback | None = None,
+) -> list[ScanResult]:
+    """Scan ports sequentially or with a fixed number of worker threads."""
+    if workers is not None and workers < 1:
+        raise ValueError("workers must be at least 1")
+    if workers in (None, 1):
+        return _scan_sequential(host, ports, timeout, on_progress)
+
+    from zscanner.concurrent import ScanPool
+
+    done = 0
+    lock = threading.Lock()
+    total = len(ports)
+
+    def report_progress(_result: ScanResult) -> None:
+        nonlocal done
+        with lock:
+            done += 1
+            if on_progress:
+                on_progress(done, total)
+
+    return ScanPool(workers, report_progress).scan(host, ports, timeout)
+
+
+def _scan_sequential(
+    host: str,
+    ports: list[int],
+    timeout: float,
+    on_progress: ProgressCallback | None,
+) -> list[ScanResult]:
+    results: list[ScanResult] = []
+    total = len(ports)
+    for done, port in enumerate(ports, 1):
+        results.append(scan_port(host, port, timeout))
+        if on_progress:
+            on_progress(done, total)
+    return results
