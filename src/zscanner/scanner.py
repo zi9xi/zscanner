@@ -20,6 +20,15 @@ class ScanResult:
     banner: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ScanOptions:
+    timeout: float = 1.0
+    workers: int | None = None
+    identify_service: bool = False
+    grab_banner: bool = False
+    max_tasks: int | None = 10_000
+
+
 _IN_PROGRESS = {
     errno.EINPROGRESS,
     errno.EWOULDBLOCK,
@@ -102,39 +111,33 @@ def scan(
     grab_banner: bool = False,
 ) -> list[ScanResult]:
     """Scan ports sequentially or with a fixed number of worker threads."""
+    options = ScanOptions(
+        timeout=timeout,
+        workers=workers,
+        identify_service=identify_service,
+        grab_banner=grab_banner,
+    )
     return scan_many(
         [host],
         ports,
-        timeout,
-        workers,
-        on_progress,
-        identify_service=identify_service,
-        grab_banner=grab_banner,
+        options,
+        on_progress=on_progress,
     )
 
 
 def scan_many(
     targets: list[str],
     ports: list[int],
-    timeout: float = 1.0,
-    workers: int | None = None,
+    options: ScanOptions | None = None,
     on_progress: ProgressCallback | None = None,
-    *,
-    identify_service: bool = False,
-    grab_banner: bool = False,
-    max_tasks: int | None = 10_000,
 ) -> list[ScanResult]:
     """Scan multiple targets and ports in stable target-then-port order."""
-    if workers is not None and workers < 1:
-        raise ValueError("workers must be at least 1")
-    if max_tasks is not None and max_tasks < 1:
-        raise ValueError("max_tasks must be at least 1")
+    options = options or ScanOptions()
+    _validate_options(options)
+    scan_tasks = _build_scan_tasks(targets, ports, options.max_tasks)
 
-    scan_tasks = _build_scan_tasks(targets, ports, max_tasks)
-    if workers in (None, 1):
-        return _scan_sequential(
-            scan_tasks, timeout, on_progress, identify_service, grab_banner
-        )
+    if options.workers in (None, 1):
+        return _scan_sequential(scan_tasks, options, on_progress)
 
     from zscanner.concurrent import ScanPool
 
@@ -149,19 +152,36 @@ def scan_many(
             if on_progress:
                 on_progress(done, total)
 
-    port_scanner = None
-    if identify_service or grab_banner:
+    return ScanPool(options.workers, report_progress).scan_tasks(
+        scan_tasks,
+        options.timeout,
+        _make_port_scanner(options),
+    )
 
-        def port_scanner(task_host: str, port: int, task_timeout: float) -> ScanResult:
-            return scan_port(
-                task_host,
-                port,
-                task_timeout,
-                identify_service=identify_service,
-                grab_banner=grab_banner,
-            )
 
-    return ScanPool(workers, report_progress).scan_tasks(scan_tasks, timeout, port_scanner)
+def _validate_options(options: ScanOptions) -> None:
+    if options.workers is not None and options.workers < 1:
+        raise ValueError("workers must be at least 1")
+    if options.max_tasks is not None and options.max_tasks < 1:
+        raise ValueError("max_tasks must be at least 1")
+    if options.timeout <= 0:
+        raise ValueError("timeout must be greater than zero")
+
+
+def _make_port_scanner(options: ScanOptions) -> Callable[[str, int, float], ScanResult] | None:
+    if not options.identify_service and not options.grab_banner:
+        return None
+
+    def scan_one(task_host: str, port: int, task_timeout: float) -> ScanResult:
+        return scan_port(
+            task_host,
+            port,
+            task_timeout,
+            identify_service=options.identify_service,
+            grab_banner=options.grab_banner,
+        )
+
+    return scan_one
 
 
 def _build_scan_tasks(
@@ -180,24 +200,14 @@ def _build_scan_tasks(
 
 def _scan_sequential(
     scan_tasks: list[ScanTask],
-    timeout: float,
+    options: ScanOptions,
     on_progress: ProgressCallback | None,
-    identify_service: bool,
-    grab_banner: bool,
 ) -> list[ScanResult]:
     results: list[ScanResult] = []
     total = len(scan_tasks)
+    scan_one = _make_port_scanner(options) or scan_port
     for done, (host, port) in enumerate(scan_tasks, 1):
-        if identify_service or grab_banner:
-            result = scan_port(
-                host,
-                port,
-                timeout,
-                identify_service=identify_service,
-                grab_banner=grab_banner,
-            )
-        else:
-            result = scan_port(host, port, timeout)
+        result = scan_one(host, port, options.timeout)
         results.append(result)
         if on_progress:
             on_progress(done, total)

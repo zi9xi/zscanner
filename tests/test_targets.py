@@ -24,7 +24,7 @@ def test_parse_targets_file(tmp_path: Path) -> None:
     assert parse(f"@{target_file}") == ["127.0.0.1", "192.168.1.1", "192.168.1.2"]
 
 
-@pytest.mark.parametrize("value", ["", " ", "@", "192.168.1.0/bad"])
+@pytest.mark.parametrize("value", ["", " ", "@", "127.0.0.1,", "192.168.1.0/bad"])
 def test_parse_targets_rejects_invalid_values(value: str) -> None:
     with pytest.raises(ValueError):
         parse(value)

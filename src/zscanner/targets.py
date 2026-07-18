@@ -39,7 +39,13 @@ def _read_items(value: str) -> list[str]:
             for line in raw.splitlines()
             if (stripped := line.strip()) and not stripped.startswith("#")
         )
-    return [item.strip() for item in value.split(",") if item.strip()]
+    items: list[str] = []
+    for item in value.split(","):
+        stripped = item.strip()
+        if not stripped:
+            raise ValueError(f"empty target entry in: {value}")
+        items.append(stripped)
+    return items
 
 
 def _expand_item(item: str) -> list[str]:

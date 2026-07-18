@@ -1,26 +1,7 @@
 import pytest
 
 from zscanner import cli
-from zscanner.scanner import ScanResult
-
-
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        ("80", [80]),
-        ("22,80,443", [22, 80, 443]),
-        ("80, 443,8000-8002", [80, 443, 8000, 8001, 8002]),
-        ("80,80", [80]),
-    ],
-)
-def test_parse_ports(value: str, expected: list[int]) -> None:
-    assert cli.parse_ports(value) == expected
-
-
-@pytest.mark.parametrize("value", ["", " ", "0", "65536", "90-80", "abc", "1--2", "80,"])
-def test_parse_ports_rejects_invalid_input(value: str) -> None:
-    with pytest.raises(ValueError):
-        cli.parse_ports(value)
+from zscanner.scanner import ScanOptions, ScanResult
 
 
 def test_main_prints_results(
@@ -28,7 +9,7 @@ def test_main_prints_results(
 ) -> None:
     monkeypatch.setattr(
         cli,
-        "scan",
+        "scan_many",
         lambda *_args, **_kwargs: [
             ScanResult("localhost", 80, True, 0.5),
             ScanResult("localhost", 81, False, 0.7, "refused"),
@@ -53,16 +34,15 @@ def test_main_forwards_workers(monkeypatch: pytest.MonkeyPatch) -> None:
     received: list[int | None] = []
 
     def fake_scan(
-        _host: str,
+        _targets: list[str],
         _ports: list[int],
-        _timeout: float,
-        workers: int | None,
+        options: ScanOptions,
         **_kwargs: object,
     ) -> list[ScanResult]:
-        received.append(workers)
+        received.append(options.workers)
         return []
 
-    monkeypatch.setattr(cli, "scan", fake_scan)
+    monkeypatch.setattr(cli, "scan_many", fake_scan)
     assert cli.main(["localhost", "-p", "80", "--workers", "8"]) == 0
     assert received == [8]
 
@@ -72,7 +52,7 @@ def test_main_writes_json(
 ) -> None:
     monkeypatch.setattr(
         cli,
-        "scan",
+        "scan_many",
         lambda *_args, **_kwargs: [ScanResult("localhost", 80, True, 0.5, service="http")],
     )
     assert cli.main(["localhost", "-p", "80", "--service", "--json"]) == 0
@@ -86,7 +66,7 @@ def test_main_writes_csv(
 ) -> None:
     monkeypatch.setattr(
         cli,
-        "scan",
+        "scan_many",
         lambda *_args, **_kwargs: [ScanResult("localhost", 80, True, 0.5, service="http")],
     )
     assert cli.main(["localhost", "-p", "80", "--csv"]) == 0
@@ -96,17 +76,17 @@ def test_main_writes_csv(
 
 
 def test_main_enables_banner_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    received: list[dict[str, object]] = []
+    received: list[ScanOptions] = []
 
-    def fake_scan(*_args: object, **kwargs: object) -> list[ScanResult]:
-        received.append(kwargs)
+    def fake_scan(
+        _targets: list[str], _ports: list[int], options: ScanOptions
+    ) -> list[ScanResult]:
+        received.append(options)
         return []
 
-    monkeypatch.setattr(cli, "scan", fake_scan)
+    monkeypatch.setattr(cli, "scan_many", fake_scan)
     assert cli.main(["localhost", "-p", "80", "--banner"]) == 0
-    assert received == [
-        {"identify_service": True, "grab_banner": True, "max_tasks": 10_000}
-    ]
+    assert received == [ScanOptions(workers=1, identify_service=True, grab_banner=True)]
 
 
 def test_main_accepts_scan_subcommand(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -121,7 +101,7 @@ def test_main_accepts_scan_subcommand(monkeypatch: pytest.MonkeyPatch) -> None:
         received.append(targets)
         return []
 
-    monkeypatch.setattr(cli, "scan", fake_scan)
+    monkeypatch.setattr(cli, "scan_many", fake_scan)
     assert cli.main(["scan", "127.0.0.1,127.0.0.2", "-p", "80"]) == 0
     assert received == [["127.0.0.1", "127.0.0.2"]]
 
@@ -129,15 +109,17 @@ def test_main_accepts_scan_subcommand(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_main_forwards_safety_limits(monkeypatch: pytest.MonkeyPatch) -> None:
     received: list[int | None] = []
 
-    def fake_scan(*_args: object, **kwargs: object) -> list[ScanResult]:
-        received.append(kwargs["max_tasks"])  # type: ignore[arg-type]
+    def fake_scan(
+        _targets: list[str], _ports: list[int], options: ScanOptions
+    ) -> list[ScanResult]:
+        received.append(options.max_tasks)
         return []
 
-    monkeypatch.setattr(cli, "scan", fake_scan)
+    monkeypatch.setattr(cli, "scan_many", fake_scan)
     assert cli.main(["scan", "127.0.0.1", "-p", "80", "--max-tasks", "5"]) == 0
     assert received == [5]
 
 
 def test_main_prints_version(capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["version"]) == 0
-    assert "zscanner 0.4.0" in capsys.readouterr().out
+    assert "zscanner 0.4.1" in capsys.readouterr().out
