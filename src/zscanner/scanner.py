@@ -1,4 +1,4 @@
-"""Simple cross-platform TCP Connect scanner."""
+"""Cross-platform TCP Connect scanner."""
 
 import errno
 import select
@@ -16,6 +16,8 @@ class ScanResult:
     is_open: bool
     latency_ms: float
     error: str | None = None
+    service: str | None = None
+    banner: str | None = None
 
 
 _IN_PROGRESS = {
@@ -45,7 +47,14 @@ def _connect_with_timeout(
     return (True, None) if error == 0 else (False, str(error))
 
 
-def scan_port(host: str, port: int, timeout: float = 1.0) -> ScanResult:
+def scan_port(
+    host: str,
+    port: int,
+    timeout: float = 1.0,
+    *,
+    identify_service: bool = False,
+    grab_banner: bool = False,
+) -> ScanResult:
     """Try to connect to one TCP port."""
     if not host.strip():
         raise ValueError("host cannot be empty")
@@ -58,12 +67,24 @@ def scan_port(host: str, port: int, timeout: float = 1.0) -> ScanResult:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             is_open, error = _connect_with_timeout(sock, (host, port), timeout)
+            banner = None
+            if is_open and grab_banner:
+                from zscanner.probe import read_banner
+
+                banner_result = read_banner(sock, timeout)
+                banner = banner_result.text
     except OSError as exc:
         is_open = False
         error = str(exc)
+        banner = None
 
     latency = (time.perf_counter() - started) * 1000
-    return ScanResult(host, port, is_open, latency, error)
+    service = None
+    if identify_service or grab_banner:
+        from zscanner.fingerprint import guess_short
+
+        service = guess_short(port)
+    return ScanResult(host, port, is_open, latency, error, service, banner)
 
 
 ProgressCallback = Callable[[int, int], None]
@@ -75,12 +96,17 @@ def scan(
     timeout: float = 1.0,
     workers: int | None = None,
     on_progress: ProgressCallback | None = None,
+    *,
+    identify_service: bool = False,
+    grab_banner: bool = False,
 ) -> list[ScanResult]:
     """Scan ports sequentially or with a fixed number of worker threads."""
     if workers is not None and workers < 1:
         raise ValueError("workers must be at least 1")
     if workers in (None, 1):
-        return _scan_sequential(host, ports, timeout, on_progress)
+        return _scan_sequential(
+            host, ports, timeout, on_progress, identify_service, grab_banner
+        )
 
     from zscanner.concurrent import ScanPool
 
@@ -95,7 +121,19 @@ def scan(
             if on_progress:
                 on_progress(done, total)
 
-    return ScanPool(workers, report_progress).scan(host, ports, timeout)
+    port_scanner = None
+    if identify_service or grab_banner:
+
+        def port_scanner(task_host: str, port: int, task_timeout: float) -> ScanResult:
+            return scan_port(
+                task_host,
+                port,
+                task_timeout,
+                identify_service=identify_service,
+                grab_banner=grab_banner,
+            )
+
+    return ScanPool(workers, report_progress).scan(host, ports, timeout, port_scanner)
 
 
 def _scan_sequential(
@@ -103,11 +141,23 @@ def _scan_sequential(
     ports: list[int],
     timeout: float,
     on_progress: ProgressCallback | None,
+    identify_service: bool,
+    grab_banner: bool,
 ) -> list[ScanResult]:
     results: list[ScanResult] = []
     total = len(ports)
     for done, port in enumerate(ports, 1):
-        results.append(scan_port(host, port, timeout))
+        if identify_service or grab_banner:
+            result = scan_port(
+                host,
+                port,
+                timeout,
+                identify_service=identify_service,
+                grab_banner=grab_banner,
+            )
+        else:
+            result = scan_port(host, port, timeout)
+        results.append(result)
         if on_progress:
             on_progress(done, total)
     return results

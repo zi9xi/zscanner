@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zscanner"
-version = "0.2.0"
-description = "An educational TCP port scanner built with Python sockets"
+version = "0.3.0"
+description = "A TCP port scanner with concurrent scanning and service discovery"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "zi9xi" }]
-keywords = ["networking", "port-scanner", "socket", "education"]
+keywords = ["networking", "port-scanner", "socket", "security", "scanner"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Environment :: Console",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
@@ -20,7 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Topic :: Education",
+  "Topic :: Security",
   "Topic :: System :: Networking",
 ]
 dependencies = []

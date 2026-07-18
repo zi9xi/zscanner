@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from zscanner.scanner import ScanResult
 
 ResultCallback = Callable[["ScanResult"], None]
+PortScanner = Callable[[str, int, float], "ScanResult"]
 Task = tuple[int, str, int]
 
 
@@ -21,12 +22,20 @@ class ScanPool:
         self.workers = workers
         self.on_result = on_result
 
-    def scan(self, host: str, ports: list[int], timeout: float = 1.0) -> list["ScanResult"]:
+    def scan(
+        self,
+        host: str,
+        ports: list[int],
+        timeout: float = 1.0,
+        port_scanner: PortScanner | None = None,
+    ) -> list["ScanResult"]:
         """Scan concurrently and return results in the input order."""
         if not ports:
             return []
 
         from zscanner.scanner import ScanResult, scan_port
+
+        scan_one = port_scanner or scan_port
 
         tasks: queue.Queue[Task | None] = queue.Queue()
         results: list[ScanResult | None] = [None] * len(ports)
@@ -47,7 +56,7 @@ class ScanPool:
                         return
                     index, task_host, port = task
                     try:
-                        result = scan_port(task_host, port, timeout)
+                        result = scan_one(task_host, port, timeout)
                     except Exception as exc:
                         with lock:
                             errors.append((index, exc))
