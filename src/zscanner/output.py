@@ -25,18 +25,50 @@ def to_text(
     """Render scan results as aligned terminal text."""
     visible = filter_results(results, show_all=show_all)
     lines: list[str] = []
-    for result in visible:
-        state = "open" if result.is_open else "closed"
-        detail = f" ({result.error})" if result.error else ""
-        columns = [f"{result.port:5}/tcp", f"{state:6}", f"{result.latency_ms:8.2f} ms"]
-        if show_service:
-            columns.append(f"{result.service or 'unknown':12}")
-        if show_banner:
-            columns.append(result.banner or "-")
-        lines.append("  ".join(columns) + detail)
+    hosts = _ordered_hosts(results)
+    group_by_host = len(hosts) > 1
+
+    if group_by_host:
+        for host in hosts:
+            host_results = [result for result in visible if result.host == host]
+            if not host_results:
+                continue
+            if lines:
+                lines.append("")
+            lines.append(f"Host: {host}")
+            lines.extend(
+                _format_result(result, show_service=show_service, show_banner=show_banner)
+                for result in host_results
+            )
+    else:
+        lines.extend(
+            _format_result(result, show_service=show_service, show_banner=show_banner)
+            for result in visible
+        )
 
     lines.append(f"Open ports: {sum(result.is_open for result in results)}")
     return "\n".join(lines)
+
+
+def _ordered_hosts(results: list[ScanResult]) -> list[str]:
+    hosts: list[str] = []
+    seen: set[str] = set()
+    for result in results:
+        if result.host not in seen:
+            seen.add(result.host)
+            hosts.append(result.host)
+    return hosts
+
+
+def _format_result(result: ScanResult, *, show_service: bool, show_banner: bool) -> str:
+    state = "open" if result.is_open else "closed"
+    detail = f" ({result.error})" if result.error else ""
+    columns = [f"{result.port:5}/tcp", f"{state:6}", f"{result.latency_ms:8.2f} ms"]
+    if show_service:
+        columns.append(f"{result.service or 'unknown':12}")
+    if show_banner:
+        columns.append(result.banner or "-")
+    return "  ".join(columns) + detail
 
 
 def to_json(results: list[ScanResult], *, show_all: bool = False) -> str:

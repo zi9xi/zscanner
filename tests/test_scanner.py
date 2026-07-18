@@ -4,7 +4,7 @@ import socket
 import pytest
 
 from zscanner import scanner
-from zscanner.scanner import ScanResult, scan, scan_port
+from zscanner.scanner import ScanResult, scan, scan_many, scan_port
 
 
 class FakeSocket:
@@ -98,3 +98,28 @@ def test_scan_preserves_order(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_scan_with_no_ports_returns_empty_list() -> None:
     assert scan("", []) == []
+
+
+def test_scan_many_preserves_target_then_port_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "zscanner.scanner.scan_port",
+        lambda host, port, _timeout: result(host, port),
+    )
+
+    results = scan_many(["host-a", "host-b"], [80, 443], workers=1)
+
+    assert [(item.host, item.port) for item in results] == [
+        ("host-a", 80),
+        ("host-a", 443),
+        ("host-b", 80),
+        ("host-b", 443),
+    ]
+
+
+def test_scan_many_rejects_excessive_task_count() -> None:
+    with pytest.raises(ValueError, match="task count"):
+        scan_many(["a", "b"], [80, 443], max_tasks=3)
+
+
+def result(host: str, port: int) -> ScanResult:
+    return ScanResult(host, port, True, 1.0)

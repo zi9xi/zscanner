@@ -19,6 +19,20 @@ def test_text_output_filters_closed_ports_by_default() -> None:
     assert "Open ports: 1" in output
 
 
+def test_text_output_groups_multiple_hosts() -> None:
+    results = [
+        ScanResult("host-a", 80, True, 1.0),
+        ScanResult("host-b", 443, True, 1.0),
+    ]
+
+    output = to_text(results)
+
+    assert "Host: host-a" in output
+    assert "Host: host-b" in output
+    assert "80/tcp" in output
+    assert "443/tcp" in output
+
+
 def test_json_output_is_machine_readable() -> None:
     output = to_json([ScanResult("localhost", 80, True, 1.25, service="http")])
     data = json.loads(output)

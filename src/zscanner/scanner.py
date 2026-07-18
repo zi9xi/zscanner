@@ -88,6 +88,7 @@ def scan_port(
 
 
 ProgressCallback = Callable[[int, int], None]
+ScanTask = tuple[str, int]
 
 
 def scan(
@@ -101,18 +102,45 @@ def scan(
     grab_banner: bool = False,
 ) -> list[ScanResult]:
     """Scan ports sequentially or with a fixed number of worker threads."""
+    return scan_many(
+        [host],
+        ports,
+        timeout,
+        workers,
+        on_progress,
+        identify_service=identify_service,
+        grab_banner=grab_banner,
+    )
+
+
+def scan_many(
+    targets: list[str],
+    ports: list[int],
+    timeout: float = 1.0,
+    workers: int | None = None,
+    on_progress: ProgressCallback | None = None,
+    *,
+    identify_service: bool = False,
+    grab_banner: bool = False,
+    max_tasks: int | None = 10_000,
+) -> list[ScanResult]:
+    """Scan multiple targets and ports in stable target-then-port order."""
     if workers is not None and workers < 1:
         raise ValueError("workers must be at least 1")
+    if max_tasks is not None and max_tasks < 1:
+        raise ValueError("max_tasks must be at least 1")
+
+    scan_tasks = _build_scan_tasks(targets, ports, max_tasks)
     if workers in (None, 1):
         return _scan_sequential(
-            host, ports, timeout, on_progress, identify_service, grab_banner
+            scan_tasks, timeout, on_progress, identify_service, grab_banner
         )
 
     from zscanner.concurrent import ScanPool
 
     done = 0
     lock = threading.Lock()
-    total = len(ports)
+    total = len(scan_tasks)
 
     def report_progress(_result: ScanResult) -> None:
         nonlocal done
@@ -133,20 +161,33 @@ def scan(
                 grab_banner=grab_banner,
             )
 
-    return ScanPool(workers, report_progress).scan(host, ports, timeout, port_scanner)
+    return ScanPool(workers, report_progress).scan_tasks(scan_tasks, timeout, port_scanner)
+
+
+def _build_scan_tasks(
+    targets: list[str], ports: list[int], max_tasks: int | None
+) -> list[ScanTask]:
+    if not targets or not ports:
+        return []
+    if any(not target.strip() for target in targets):
+        raise ValueError("target cannot be empty")
+
+    total = len(targets) * len(ports)
+    if max_tasks is not None and total > max_tasks:
+        raise ValueError(f"scan task count exceeds limit: {max_tasks}")
+    return [(target, port) for target in targets for port in ports]
 
 
 def _scan_sequential(
-    host: str,
-    ports: list[int],
+    scan_tasks: list[ScanTask],
     timeout: float,
     on_progress: ProgressCallback | None,
     identify_service: bool,
     grab_banner: bool,
 ) -> list[ScanResult]:
     results: list[ScanResult] = []
-    total = len(ports)
-    for done, port in enumerate(ports, 1):
+    total = len(scan_tasks)
+    for done, (host, port) in enumerate(scan_tasks, 1):
         if identify_service or grab_banner:
             result = scan_port(
                 host,

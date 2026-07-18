@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 ResultCallback = Callable[["ScanResult"], None]
 PortScanner = Callable[[str, int, float], "ScanResult"]
 Task = tuple[int, str, int]
+ScanTask = tuple[str, int]
 
 
 class ScanPool:
@@ -30,7 +31,16 @@ class ScanPool:
         port_scanner: PortScanner | None = None,
     ) -> list["ScanResult"]:
         """Scan concurrently and return results in the input order."""
-        if not ports:
+        return self.scan_tasks([(host, port) for port in ports], timeout, port_scanner)
+
+    def scan_tasks(
+        self,
+        scan_tasks: list[ScanTask],
+        timeout: float = 1.0,
+        port_scanner: PortScanner | None = None,
+    ) -> list["ScanResult"]:
+        """Scan host/port tasks concurrently and return results in input order."""
+        if not scan_tasks:
             return []
 
         from zscanner.scanner import ScanResult, scan_port
@@ -38,12 +48,12 @@ class ScanPool:
         scan_one = port_scanner or scan_port
 
         tasks: queue.Queue[Task | None] = queue.Queue()
-        results: list[ScanResult | None] = [None] * len(ports)
+        results: list[ScanResult | None] = [None] * len(scan_tasks)
         errors: list[tuple[int, Exception]] = []
         lock = threading.Lock()
-        worker_count = min(self.workers, len(ports))
+        worker_count = min(self.workers, len(scan_tasks))
 
-        for index, port in enumerate(ports):
+        for index, (host, port) in enumerate(scan_tasks):
             tasks.put((index, host, port))
         for _ in range(worker_count):
             tasks.put(None)

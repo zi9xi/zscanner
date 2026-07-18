@@ -104,4 +104,40 @@ def test_main_enables_banner_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(cli, "scan", fake_scan)
     assert cli.main(["localhost", "-p", "80", "--banner"]) == 0
-    assert received == [{"identify_service": True, "grab_banner": True}]
+    assert received == [
+        {"identify_service": True, "grab_banner": True, "max_tasks": 10_000}
+    ]
+
+
+def test_main_accepts_scan_subcommand(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: list[list[str]] = []
+
+    def fake_scan(
+        targets: list[str],
+        _ports: list[int],
+        *_args: object,
+        **_kwargs: object,
+    ) -> list[ScanResult]:
+        received.append(targets)
+        return []
+
+    monkeypatch.setattr(cli, "scan", fake_scan)
+    assert cli.main(["scan", "127.0.0.1,127.0.0.2", "-p", "80"]) == 0
+    assert received == [["127.0.0.1", "127.0.0.2"]]
+
+
+def test_main_forwards_safety_limits(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: list[int | None] = []
+
+    def fake_scan(*_args: object, **kwargs: object) -> list[ScanResult]:
+        received.append(kwargs["max_tasks"])  # type: ignore[arg-type]
+        return []
+
+    monkeypatch.setattr(cli, "scan", fake_scan)
+    assert cli.main(["scan", "127.0.0.1", "-p", "80", "--max-tasks", "5"]) == 0
+    assert received == [5]
+
+
+def test_main_prints_version(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["version"]) == 0
+    assert "zscanner 0.4.0" in capsys.readouterr().out
