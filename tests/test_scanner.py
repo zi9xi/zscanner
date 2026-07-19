@@ -4,7 +4,15 @@ import socket
 import pytest
 
 from zscanner import scanner
-from zscanner.scanner import ScanOptions, ScanResult, scan, scan_many, scan_port
+from zscanner.scanner import (
+    ScanOptions,
+    ScanResult,
+    open_only,
+    scan,
+    scan_many,
+    scan_port,
+    scan_web_targets,
+)
 
 
 class FakeSocket:
@@ -44,6 +52,20 @@ def test_scan_port_open(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.latency_ms >= 0
     assert fake.blocking is False
     assert fake.address == ("127.0.0.1", 80)
+
+
+def test_scan_result_as_dict() -> None:
+    result = ScanResult("localhost", 80, True, 1.25, service="http")
+
+    assert result.as_dict() == {
+        "host": "localhost",
+        "port": 80,
+        "is_open": True,
+        "latency_ms": 1.25,
+        "error": None,
+        "service": "http",
+        "banner": None,
+    }
 
 
 def test_scan_port_handles_immediate_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,6 +141,37 @@ def test_scan_many_preserves_target_then_port_order(monkeypatch: pytest.MonkeyPa
 def test_scan_many_rejects_excessive_task_count() -> None:
     with pytest.raises(ValueError, match="task count"):
         scan_many(["a", "b"], [80, 443], ScanOptions(max_tasks=3))
+
+
+def test_open_only_filters_closed_results() -> None:
+    results = [
+        ScanResult("localhost", 80, True, 1.0),
+        ScanResult("localhost", 81, False, 1.0),
+    ]
+
+    assert open_only(results) == [results[0]]
+
+
+def test_scan_web_targets_uses_web_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: list[tuple[list[str], list[int], ScanOptions | None]] = []
+
+    def fake_scan_many(
+        targets: list[str],
+        ports: list[int],
+        options: ScanOptions | None = None,
+        *_args: object,
+        **_kwargs: object,
+    ) -> list[ScanResult]:
+        received.append((targets, ports, options))
+        return []
+
+    monkeypatch.setattr("zscanner.scanner.scan_many", fake_scan_many)
+
+    assert scan_web_targets(["localhost"]) == []
+    targets, ports, options = received[0]
+    assert targets == ["localhost"]
+    assert ports[:4] == [80, 443, 8080, 8443]
+    assert options == ScanOptions(workers=50, identify_service=True, grab_banner=True)
 
 
 def result(host: str, port: int) -> ScanResult:

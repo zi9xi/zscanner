@@ -122,4 +122,4 @@ def test_main_forwards_safety_limits(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_main_prints_version(capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["version"]) == 0
-    assert "zscanner 0.4.1" in capsys.readouterr().out
+    assert "zscanner 0.4.2" in capsys.readouterr().out

@@ -2,6 +2,8 @@
 
 这是我用 Python 编写的一个多目标 TCP 扫描器项目。我希望它保持轻量、清楚、可读，同时支持日常扫描时常用的 CIDR 目标、并发扫描、服务名称提示、Banner 读取，以及 JSON/CSV 输出。
 
+这个项目会继续保持独立可用，但接口设计也会兼顾后续的 AIScanner：AIScanner 会把 zscanner 作为底层侦察模块，用它完成目标解析、端口扫描、开放端口过滤和轻量服务识别。
+
 请只扫描自己拥有或已获得授权的系统。
 
 ## 安装
@@ -84,14 +86,22 @@ Open ports: 2
 ## Python API
 
 ```python
-from zscanner import ScanOptions, parse_ports, parse_targets, scan_many
+from zscanner import ScanOptions, open_only, parse_ports, parse_targets, scan_many
 
 targets = parse_targets("127.0.0.1,192.168.1.0/30")
 ports = parse_ports("22,80,443")
 options = ScanOptions(workers=50, timeout=0.5, identify_service=True)
 
-for result in scan_many(targets, ports, options):
-    print(result.host, result.port, result.is_open, result.service)
+for result in open_only(scan_many(targets, ports, options)):
+    print(result.as_dict())
+```
+
+扫描常见 Web 端口：
+
+```python
+from zscanner import parse_targets, scan_web_targets
+
+results = scan_web_targets(parse_targets("127.0.0.1"))
 ```
 
 单独读取 Banner：

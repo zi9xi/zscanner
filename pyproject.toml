@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zscanner"
-version = "0.4.1"
+version = "0.4.2"
 description = "A multi-target TCP scanner with concurrent scanning and service discovery"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -3,7 +3,6 @@
 import csv
 import io
 import json
-from dataclasses import asdict
 
 from zscanner.scanner import ScanResult
 
@@ -74,7 +73,7 @@ def _format_result(result: ScanResult, *, show_service: bool, show_banner: bool)
 def to_json(results: list[ScanResult], *, show_all: bool = False) -> str:
     """Render scan results as stable JSON."""
     visible = filter_results(results, show_all=show_all)
-    return json.dumps([asdict(result) for result in visible], ensure_ascii=False, indent=2)
+    return json.dumps([result.as_dict() for result in visible], ensure_ascii=False, indent=2)
 
 
 def to_csv(results: list[ScanResult], *, show_all: bool = False) -> str:

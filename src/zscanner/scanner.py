@@ -19,6 +19,17 @@ class ScanResult:
     service: str | None = None
     banner: str | None = None
 
+    def as_dict(self) -> dict[str, str | int | float | bool | None]:
+        return {
+            "host": self.host,
+            "port": self.port,
+            "is_open": self.is_open,
+            "latency_ms": self.latency_ms,
+            "error": self.error,
+            "service": self.service,
+            "banner": self.banner,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class ScanOptions:
@@ -157,6 +168,23 @@ def scan_many(
         options.timeout,
         _make_port_scanner(options),
     )
+
+
+def scan_web_targets(
+    targets: list[str],
+    options: ScanOptions | None = None,
+    on_progress: ProgressCallback | None = None,
+) -> list[ScanResult]:
+    """Scan common web ports with service hints and banner reads enabled."""
+    from zscanner.profiles import WEB_PORTS
+
+    scan_options = options or ScanOptions(workers=50, identify_service=True, grab_banner=True)
+    return scan_many(targets, WEB_PORTS, scan_options, on_progress=on_progress)
+
+
+def open_only(results: list[ScanResult]) -> list[ScanResult]:
+    """Return only open scan results."""
+    return [result for result in results if result.is_open]
 
 
 def _validate_options(options: ScanOptions) -> None:
