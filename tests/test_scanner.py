@@ -54,6 +54,19 @@ def test_scan_port_open(monkeypatch: pytest.MonkeyPatch) -> None:
     assert fake.address == ("127.0.0.1", 80)
 
 
+def test_scan_port_uses_banner_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    install_socket(monkeypatch, FakeSocket())
+    monkeypatch.setattr(
+        "zscanner.scanner._grab_banner",
+        lambda _host, _port, _sock, _timeout: "nginx",
+    )
+
+    result = scan_port("127.0.0.1", 80, 0.5, grab_banner=True, banner_timeout=0.2)
+
+    assert result.banner == "nginx"
+    assert result.service == "http"
+
+
 def test_scan_result_as_dict() -> None:
     result = ScanResult("localhost", 80, True, 1.25, service="http")
 
@@ -111,6 +124,11 @@ def test_scan_port_validation(host: str, port: int, timeout: float, message: str
         scan_port(host, port, timeout)
 
 
+def test_scan_port_rejects_invalid_banner_timeout() -> None:
+    with pytest.raises(ValueError, match="banner_timeout"):
+        scan_port("localhost", 80, banner_timeout=0)
+
+
 def test_scan_preserves_order(monkeypatch: pytest.MonkeyPatch) -> None:
     install_socket(monkeypatch, FakeSocket())
     results = scan("localhost", [443, 80], 0.2)
@@ -141,6 +159,11 @@ def test_scan_many_preserves_target_then_port_order(monkeypatch: pytest.MonkeyPa
 def test_scan_many_rejects_excessive_task_count() -> None:
     with pytest.raises(ValueError, match="task count"):
         scan_many(["a", "b"], [80, 443], ScanOptions(max_tasks=3))
+
+
+def test_scan_many_rejects_invalid_banner_timeout() -> None:
+    with pytest.raises(ValueError, match="banner_timeout"):
+        scan_many(["localhost"], [80], ScanOptions(banner_timeout=0))
 
 
 def test_open_only_filters_closed_results() -> None:

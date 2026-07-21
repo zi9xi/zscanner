@@ -1,5 +1,7 @@
 """Reusable port profiles."""
 
+HTTP_PORTS: list[int] = [80, 8080, 3000, 5000, 8000, 8888, 9090]
+HTTPS_PORTS: list[int] = [443, 8443, 4443, 9443]
 WEB_PORTS: list[int] = [80, 443, 8080, 8443, 3000, 5000, 8000, 8888, 9090, 4443, 9443]
 
 COMMON_PORTS: list[int] = [

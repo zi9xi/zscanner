@@ -37,6 +37,7 @@ class ScanOptions:
     workers: int | None = None
     identify_service: bool = False
     grab_banner: bool = False
+    banner_timeout: float | None = None
     max_tasks: int | None = 10_000
 
 
@@ -74,6 +75,7 @@ def scan_port(
     *,
     identify_service: bool = False,
     grab_banner: bool = False,
+    banner_timeout: float | None = None,
 ) -> ScanResult:
     """Try to connect to one TCP port."""
     if not host.strip():
@@ -82,6 +84,8 @@ def scan_port(
         raise ValueError("port must be between 1 and 65535")
     if timeout <= 0:
         raise ValueError("timeout must be greater than zero")
+    if banner_timeout is not None and banner_timeout <= 0:
+        raise ValueError("banner_timeout must be greater than zero")
 
     started = time.perf_counter()
     try:
@@ -89,10 +93,7 @@ def scan_port(
             is_open, error = _connect_with_timeout(sock, (host, port), timeout)
             banner = None
             if is_open and grab_banner:
-                from zscanner.probe import read_banner
-
-                banner_result = read_banner(sock, timeout)
-                banner = banner_result.text
+                banner = _grab_banner(host, port, sock, banner_timeout or timeout)
     except OSError as exc:
         is_open = False
         error = str(exc)
@@ -120,6 +121,7 @@ def scan(
     *,
     identify_service: bool = False,
     grab_banner: bool = False,
+    banner_timeout: float | None = None,
 ) -> list[ScanResult]:
     """Scan ports sequentially or with a fixed number of worker threads."""
     options = ScanOptions(
@@ -127,6 +129,7 @@ def scan(
         workers=workers,
         identify_service=identify_service,
         grab_banner=grab_banner,
+        banner_timeout=banner_timeout,
     )
     return scan_many(
         [host],
@@ -194,6 +197,8 @@ def _validate_options(options: ScanOptions) -> None:
         raise ValueError("max_tasks must be at least 1")
     if options.timeout <= 0:
         raise ValueError("timeout must be greater than zero")
+    if options.banner_timeout is not None and options.banner_timeout <= 0:
+        raise ValueError("banner_timeout must be greater than zero")
 
 
 def _make_port_scanner(options: ScanOptions) -> Callable[[str, int, float], ScanResult] | None:
@@ -207,9 +212,20 @@ def _make_port_scanner(options: ScanOptions) -> Callable[[str, int, float], Scan
             task_timeout,
             identify_service=options.identify_service,
             grab_banner=options.grab_banner,
+            banner_timeout=options.banner_timeout,
         )
 
     return scan_one
+
+
+def _grab_banner(host: str, port: int, sock: socket.socket, timeout: float) -> str | None:
+    from zscanner.http_probe import probe_http_server
+    from zscanner.probe import read_banner
+
+    banner = read_banner(sock, timeout).text
+    if banner:
+        return banner
+    return probe_http_server(host, port, timeout)
 
 
 def _build_scan_tasks(
